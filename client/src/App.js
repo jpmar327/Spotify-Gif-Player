@@ -53,31 +53,34 @@ class App extends Component {
 
 // Calls Spotify API to get the track info
 // Promises are asynchronous (kinda like multithreading)
-  getNowPlaying(){
-    spotifyApi.getMyCurrentPlaybackState()
-      .then((data) => {
+getNowPlaying() {
+  spotifyApi
+    .getMyCurrentPlaybackState()
+    .then((data) => {
+      
+      this.setState({
+        nowPlaying: {
+          trackName: data.item.name,
+          previous: this.state.nowPlaying.previous,
+          albumArt: data.item.album.images[0].url,
+          artists_id: data.item.artists[0].id,
+        },
+      });
+      // Calls Spotify API to get artists genre
+      spotifyApi
+      .getArtist("" + data.item.artists[0].id)
+      .then((response) => {
         this.setState({
-          nowPlaying: {
-              trackName: data.item.name,
-              previous: this.state.nowPlaying.previous,
-              albumArt: data.item.album.images[0].url,
-              artists_id: data.item.artists[0].id
-            }
+          genreArray: response.genres,
         });
       })
-      .catch(error => console.log('Spotify is closed: ' + error.message));
-    }
+      .catch((error) => console.log("Spotify is closed: " + error.message));
+    })
+    .catch((error) => console.log("Spotify is closed: " + error.message));
+}
 
-// Calls Spotify API to get artists genre
-getArtistInfo(info){
-  spotifyApi.getArtist(''+info)
-  .then((response) => {
-    this.setState({
-      genreArray: response.genres}
-    );
-  })
-    .catch(error => console.log('Spotify is closed: ' + error.message));
-  }
+
+
 
   /*Make object for counting genres genreFinder(input)
     - loop through genresList use forEach()
@@ -135,13 +138,10 @@ getArtistInfo(info){
   };
     if (genreIndex != undefined) {
       var max = gifList[genreIndex].length;
-      // console.log(gifList[genreIndex]);
-      // console.log(max);
       var index = Math.floor(Math.random() * (max - min)) + min;
       console.log("index = " + index)
       console.log( gifList[genreIndex][index])
       this.setState({genreGif: gifList[genreIndex][index]});
-      // return linkArray[genre][index];
     }
   }
 
@@ -181,7 +181,7 @@ getArtistInfo(info){
     this.myInterval = setInterval(() => {
 // Makes sure the song gets checked to compare
       this.getNowPlaying();
-      this.getArtistInfo(this.state.nowPlaying.artists_id);
+      // this.getArtistInfo(this.state.nowPlaying.artists_id);
       this.genreFinder(this.state.genreArray);
       
       
