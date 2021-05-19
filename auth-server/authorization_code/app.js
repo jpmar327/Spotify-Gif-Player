@@ -7,6 +7,19 @@
  * https://developer.spotify.com/web-api/authorization-guide/#authorization_code_flow
  */
 
+// const PORT = process.env.PORT || 8888;
+// if (process.env.NODE_ENV === "production") {
+//   // Express will serve up production assets
+//   // Like main.js file, or main.css files
+//   app.use(express.static("client/build"));
+//   // Express will serve up index.html file
+//   // If it doens't recognize the route
+//   const path = require("path");
+//   app.get("*", (req, res) => {
+//     res.sendFile(path.resolve(__dirname, "client", "build", "index.html"));
+//   });
+// }
+
 var express = require('express'); // Express web server framework
 var request = require('request'); // "Request" library
 var cors = require('cors');
