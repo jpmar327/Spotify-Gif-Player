@@ -10,6 +10,6 @@
     "request": "~2.83.0"
   },
   "scripts": {
-  "start": "node authorization_code/app.js",
+  "start": "node auth-server/authorization_code/app.js",
   "heroku-postbuild": "NPM_CONFIG_PRODUCTION=false npm install --prefix client && npm run build --prefix client"}
 }
