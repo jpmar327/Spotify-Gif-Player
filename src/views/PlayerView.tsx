@@ -3,6 +3,7 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open } from '@tauri-apps/plugin-shell';
 import { useSpotify } from '../hooks/useSpotify';
 import { useGiphy } from '../hooks/useGiphy';
+import { getAudioFeatures, getAudioAnalysis } from '../lib/spotify';
 
 interface Props {
   accessToken: string;
@@ -34,25 +35,30 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, []);
 
-  const handleOpenInfo = useCallback(() => {
+  const handleOpenInfo = useCallback(async () => {
     if (!currentTrack) return;
+
+    const [audioFeatures, audioAnalysis] = await Promise.all([
+      getAudioFeatures(currentTrack.trackId, accessToken).catch(() => null),
+      getAudioAnalysis(currentTrack.trackId, accessToken).catch(() => null),
+    ]);
 
     localStorage.setItem(
       'gif-player-meta',
-      JSON.stringify({ track: currentTrack, genre: currentGenre })
+      JSON.stringify({ track: currentTrack, genre: currentGenre, audioFeatures, audioAnalysis })
     );
 
     const win = new WebviewWindow('track-metadata', {
       url: '/?view=metadata',
       title: 'Track Info',
       width: 540,
-      height: 660,
+      height: 820,
       resizable: false,
       decorations: true,
       alwaysOnTop: true,
     });
     win.once('tauri://error', (e) => console.error('[meta-window]', e));
-  }, [currentTrack, currentGenre]);
+  }, [currentTrack, currentGenre, accessToken]);
 
   const isSpotifyPlaying = currentTrack?.isPlaying ?? false;
 
@@ -181,7 +187,7 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
 
               {/* Info button */}
               <button
-                onClick={handleOpenInfo}
+                onClick={() => { void handleOpenInfo(); }}
                 title="View track details"
                 style={{
                   flexShrink: 0,

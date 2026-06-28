@@ -46,6 +46,7 @@ export function useSpotify({
   const onTokenRefreshedRef = useRef(onTokenRefreshed);
   const wasIdleRef = useRef(false);
   const lastGenreRef = useRef<string | null>(null);
+  const lastGifChangeRef = useRef<number>(0);
 
   tokenRef.current = accessToken;
   onTrackChangeRef.current = onTrackChange;
@@ -118,8 +119,13 @@ export function useSpotify({
       setCurrentTrack(playback);
 
       if (playback.trackId === previousTrackIdRef.current) {
-        // Same track — if we just resumed from pause/idle, restore the GIF
         if (wasIdle && lastGenreRef.current) {
+          // Resumed from pause/idle — restore the GIF and reset the rotation timer
+          lastGifChangeRef.current = Date.now();
+          onTrackChangeRef.current(lastGenreRef.current);
+        } else if (lastGenreRef.current && Date.now() - lastGifChangeRef.current >= 30_000) {
+          // 30 seconds elapsed while the same track plays — rotate to a new GIF
+          lastGifChangeRef.current = Date.now();
           onTrackChangeRef.current(lastGenreRef.current);
         }
         return;
@@ -137,6 +143,7 @@ export function useSpotify({
 
       const genre = genreFinder(genres) ?? 'music';
       lastGenreRef.current = genre;
+      lastGifChangeRef.current = Date.now();
       setCurrentGenre(genre);
       onTrackChangeRef.current(genre);
     };

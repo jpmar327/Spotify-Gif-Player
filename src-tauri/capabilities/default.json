@@ -15,6 +15,7 @@
     "deep-link:allow-get-current",
     "deep-link:allow-is-registered",
     "core:webview:allow-create-webview-window",
-    "core:window:allow-create"
+    "core:window:allow-create",
+    "core:window:allow-set-size"
   ]
 }

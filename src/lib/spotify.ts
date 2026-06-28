@@ -97,6 +97,100 @@ export async function getCurrentlyPlaying(accessToken: string): Promise<NowPlayi
   };
 }
 
+export interface AudioFeatures {
+  acousticness: number;
+  danceability: number;
+  energy: number;
+  instrumentalness: number;
+  key: number;       // -1 = no key detected, 0–11 = pitch class
+  liveness: number;
+  loudness: number;  // dB, typically -60 to 0
+  mode: number;      // 0 = minor, 1 = major
+  speechiness: number;
+  tempo: number;     // BPM
+  time_signature: number;
+  valence: number;
+}
+
+export async function getAudioFeatures(trackId: string, accessToken: string): Promise<AudioFeatures | null> {
+  const res = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as AudioFeatures;
+}
+
+export interface AudioAnalysisSection {
+  start: number;
+  duration: number;
+  confidence: number;
+  loudness: number;
+  tempo: number;
+  tempo_confidence: number;
+  key: number;
+  key_confidence: number;
+  mode: number;
+  mode_confidence: number;
+  time_signature: number;
+  time_signature_confidence: number;
+}
+
+export interface AudioAnalysis {
+  track: {
+    duration: number;
+    end_of_fade_in: number;
+    start_of_fade_out: number;
+    loudness: number;
+    tempo: number;
+    tempo_confidence: number;
+    time_signature: number;
+    time_signature_confidence: number;
+    key: number;
+    key_confidence: number;
+    mode: number;
+    mode_confidence: number;
+    num_samples: number;
+    analysis_sample_rate: number;
+  };
+  counts: {
+    bars: number;
+    beats: number;
+    tatums: number;
+    sections: number;
+    segments: number;
+  };
+  sections: AudioAnalysisSection[];
+}
+
+export async function getAudioAnalysis(trackId: string, accessToken: string): Promise<AudioAnalysis | null> {
+  const res = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) return null;
+
+  const raw = (await res.json()) as {
+    track: AudioAnalysis['track'];
+    bars: unknown[];
+    beats: unknown[];
+    tatums: unknown[];
+    sections: AudioAnalysisSection[];
+    segments: unknown[];
+  };
+
+  // Strip the raw segments array (hundreds of entries, not visualisable) — keep only the count.
+  return {
+    track: raw.track,
+    counts: {
+      bars:     raw.bars.length,
+      beats:    raw.beats.length,
+      tatums:   raw.tatums.length,
+      sections: raw.sections.length,
+      segments: raw.segments.length,
+    },
+    sections: raw.sections,
+  };
+}
+
 export async function getArtistGenres(artistId: string, accessToken: string): Promise<string[]> {
   const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
