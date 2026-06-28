@@ -18,6 +18,7 @@ interface UseSpotifyOptions {
   onIdle: () => void;
   onTokenRefreshed: (newToken: string) => void;
   isRunning: boolean;
+  autoRotate: boolean;
 }
 
 export interface UseSpotifyResult {
@@ -35,6 +36,7 @@ export function useSpotify({
   onIdle,
   onTokenRefreshed,
   isRunning,
+  autoRotate,
 }: UseSpotifyOptions): UseSpotifyResult {
   const [currentTrack, setCurrentTrack] = useState<NowPlaying | null>(null);
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
@@ -47,11 +49,13 @@ export function useSpotify({
   const wasIdleRef = useRef(false);
   const lastGenreRef = useRef<string | null>(null);
   const lastGifChangeRef = useRef<number>(0);
+  const autoRotateRef = useRef(autoRotate);
 
   tokenRef.current = accessToken;
   onTrackChangeRef.current = onTrackChange;
   onIdleRef.current = onIdle;
   onTokenRefreshedRef.current = onTokenRefreshed;
+  autoRotateRef.current = autoRotate;
 
   useEffect(() => {
     if (!isRunning || !accessToken) return;
@@ -123,8 +127,8 @@ export function useSpotify({
           // Resumed from pause/idle — restore the GIF and reset the rotation timer
           lastGifChangeRef.current = Date.now();
           onTrackChangeRef.current(lastGenreRef.current);
-        } else if (lastGenreRef.current && Date.now() - lastGifChangeRef.current >= 30_000) {
-          // 30 seconds elapsed while the same track plays — rotate to a new GIF
+        } else if (autoRotateRef.current && lastGenreRef.current && Date.now() - lastGifChangeRef.current >= 90_000) {
+          // 1.5 minutes elapsed while the same track plays — rotate to a new GIF
           lastGifChangeRef.current = Date.now();
           onTrackChangeRef.current(lastGenreRef.current);
         }

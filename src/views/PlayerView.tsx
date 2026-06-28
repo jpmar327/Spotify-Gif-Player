@@ -13,6 +13,7 @@ interface Props {
 
 export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
   const [isRunning, setIsRunning] = useState(true);
+  const [autoRotate, setAutoRotate] = useState(true);
   const [overlayVisible, setOverlayVisible] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -23,6 +24,7 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
     onIdle: showIdle,
     onTokenRefreshed,
     isRunning,
+    autoRotate,
   });
 
   const showOverlay = useCallback(() => {
@@ -251,6 +253,13 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
               onClick={() => { setIsRunning(false); showIdle(); }}
             />
             <Sep />
+            <TextButton
+              label={autoRotate ? 'Rotate: On' : 'Rotate: Off'}
+              onClick={() => setAutoRotate((v) => !v)}
+              title="Toggle automatic GIF rotation every 1.5 min"
+              active={autoRotate}
+            />
+            <Sep />
             <TextButton label="Logout" onClick={onLogout} />
           </div>
         </div>
@@ -311,11 +320,13 @@ function TextButton({
   onClick,
   disabled,
   title,
+  active,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   title?: string;
+  active?: boolean;
 }) {
   return (
     <button
@@ -325,7 +336,7 @@ function TextButton({
       style={{
         background: 'none',
         border: 'none',
-        color: disabled ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.65)',
+        color: disabled ? 'rgba(255,255,255,0.25)' : active ? '#1DB954' : 'rgba(255,255,255,0.65)',
         fontSize: '0.7rem',
         fontWeight: 600,
         cursor: disabled ? 'default' : 'pointer',
