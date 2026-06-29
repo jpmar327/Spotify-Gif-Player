@@ -1,3 +1,5 @@
+import { loggedFetch } from './apiLogger';
+
 const GENRE_LIST = [
   'rap', 'hip hop', 'rock', 'alternative', 'country',
   'trap', 'metal', 'jazz', 'r&b', 'pop', 'funk', 'edm', 'soul',
@@ -113,9 +115,11 @@ export interface AudioFeatures {
 }
 
 export async function getAudioFeatures(trackId: string, accessToken: string): Promise<AudioFeatures | null> {
-  const res = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const res = await loggedFetch(
+    'Spotify GET /audio-features/{id}',
+    `https://api.spotify.com/v1/audio-features/${trackId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
   if (!res.ok) return null;
   return (await res.json()) as AudioFeatures;
 }
@@ -163,9 +167,11 @@ export interface AudioAnalysis {
 }
 
 export async function getAudioAnalysis(trackId: string, accessToken: string): Promise<AudioAnalysis | null> {
-  const res = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const res = await loggedFetch(
+    'Spotify GET /audio-analysis/{id}',
+    `https://api.spotify.com/v1/audio-analysis/${trackId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
   if (!res.ok) return null;
 
   const raw = (await res.json()) as {
@@ -192,9 +198,11 @@ export async function getAudioAnalysis(trackId: string, accessToken: string): Pr
 }
 
 export async function getArtistGenres(artistId: string, accessToken: string): Promise<string[]> {
-  const res = await fetch(`https://api.spotify.com/v1/artists/${artistId}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+  const res = await loggedFetch(
+    'Spotify GET /artists/{id}',
+    `https://api.spotify.com/v1/artists/${artistId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
   if (!res.ok) throw Object.assign(new Error(`Artist fetch failed: ${res.status}`), { status: res.status });
   const data = (await res.json()) as { genres: string[] };
   return data.genres ?? [];

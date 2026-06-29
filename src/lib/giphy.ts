@@ -1,3 +1,5 @@
+import { loggedFetch } from './apiLogger';
+
 const API_KEY = import.meta.env.VITE_GIPHY_API_KEY as string;
 const GIPHY_SEARCH = 'https://api.giphy.com/v1/gifs/search';
 
@@ -21,7 +23,7 @@ export async function fetchGif(query: string): Promise<GiphyResult | null> {
 
   let res: Response;
   try {
-    res = await fetch(`${GIPHY_SEARCH}?${params}`);
+    res = await loggedFetch('Giphy GET /gifs/search', `${GIPHY_SEARCH}?${params}`);
   } catch {
     return null;
   }

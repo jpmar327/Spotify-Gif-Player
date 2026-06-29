@@ -24,16 +24,40 @@ https://tauri.app/start/prerequisites/
 
 ## Configuration
 
-### 1. Add Your Giphy API Key
+### 1. Create Your `.env` File
+Copy `.env.example` to `.env` and fill in your API keys:
+```
+cp .env.example .env
+```
+Then open `.env` and replace each placeholder with your actual key (see sections below).
+
+### 2. Add Your Spotify Client ID
+1. Go to https://developer.spotify.com/dashboard and sign in.
+2. Create an app (or open an existing one).
+3. Copy the **Client ID** and set it in `.env`:
+```
+VITE_SPOTIFY_CLIENT_ID=your_client_id_here
+```
+
+### 3. Add Your Giphy API Key
 1. Go to https://developers.giphy.com and sign up for a free account.
-2. Create a new app to obtain an API key.
-3. Open `.env` in the project root and replace the placeholder:
+2. Create a new app to obtain an API key (choose "API", not "SDK").
+3. Set it in `.env`:
 ```
 VITE_GIPHY_API_KEY=your_actual_key_here
 ```
 Without a key the app still runs but shows the idle image for every track.
 
-### 2. Register the Redirect URI in Spotify Developer Dashboard
+### 4. Add Your Last.fm API Key (optional — genre fallback)
+Last.fm is used as a fallback when Spotify returns no genre tags for an artist (~30–40% of tracks). Without it the app searches Giphy for "music" as a last resort.
+1. Go to https://www.last.fm/api/account/create and create a free API account.
+2. Copy the **API key** (not the secret) and set it in `.env`:
+```
+VITE_LASTFM_API_KEY=your_lastfm_key_here
+```
+If the key is missing or left as the placeholder, a console warning is logged and the app continues working normally.
+
+### 5. Register the Redirect URI in Spotify Developer Dashboard
 The PKCE flow redirects back to the app using a custom URI scheme (`spotifygif://callback`).
 You must whitelist this URI in your Spotify app settings:
 
@@ -43,14 +67,14 @@ You must whitelist this URI in your Spotify app settings:
 4. Under **Redirect URIs**, add: `spotifygif://callback`
 5. Save
 
-### 3. Generate App Icons (required to build)
+### 6. Generate App Icons (required to build)
 Replace the placeholder `src-tauri/icons/` directory with real icons. The easiest way is to run (after `npm install`):
 ```
 npm run tauri icon path/to/your/image.png
 ```
 This generates all required sizes from a single 1024×1024 PNG. Without valid icons, `tauri build` will fail.
 
-### 4. Replace the Idle GIF (optional)
+### 7. Replace the Idle GIF (optional)
 `public/idle.gif` is shown when Spotify is paused or closed. Replace it with any GIF you like.
 
 ---
@@ -109,8 +133,9 @@ Spotify-Gif-Player/
 │   │   └── useGiphy.ts       # GIF fetch, preload, crossfade
 │   └── lib/
 │       ├── auth.ts           # PKCE helpers, token exchange/refresh
-│       ├── store.ts          # tauri-plugin-store wrappers (persistent token)
+│       ├── store.ts          # tauri-plugin-store wrappers (persistent token + track meta)
 │       ├── spotify.ts        # Spotify API calls + genreFinder logic
+│       ├── lastfm.ts         # Last.fm track.getTopTags (genre fallback)
 │       └── giphy.ts          # Giphy REST API search + preload
 ├── src-tauri/
 │   ├── src/
@@ -122,7 +147,8 @@ Spotify-Gif-Player/
 │   └── tauri.conf.json       # Window config, bundle targets, URI scheme
 ├── public/
 │   └── idle.gif              # Shown when Spotify is paused/stopped
-├── .env                      # API keys (not committed)
+├── .env                      # API keys (not committed — copy from .env.example)
+├── .env.example              # Template with all required key names
 └── SETUP.md
 ```
 

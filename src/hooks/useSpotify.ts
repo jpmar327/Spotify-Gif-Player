@@ -10,7 +10,8 @@ import {
   type NowPlaying,
 } from '../lib/spotify';
 import { refreshAccessToken } from '../lib/auth';
-import { getRefreshToken, setRefreshToken } from '../lib/store';
+import { getRefreshToken, setRefreshToken, clearApiLog } from '../lib/store';
+import { getTrackTags } from '../lib/lastfm';
 
 interface UseSpotifyOptions {
   accessToken: string;
@@ -137,12 +138,21 @@ export function useSpotify({
 
       // Track changed — fetch genres and trigger new GIF
       previousTrackIdRef.current = playback.trackId;
+      await clearApiLog();
 
       let genres: string[] = [];
       try {
         genres = await getArtistGenres(playback.artistId, tokenRef.current);
       } catch {
-        // falls back to "music" via genreFinder returning undefined
+        // Spotify genre fetch failed — will try Last.fm below
+      }
+
+      if (genres.length === 0) {
+        try {
+          genres = await getTrackTags(playback.artistName, playback.trackName);
+        } catch {
+          // Last.fm also failed — genre will fall back to 'music' via genreFinder
+        }
       }
 
       const genre = genreFinder(genres) ?? 'music';

@@ -4,6 +4,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import { useSpotify } from '../hooks/useSpotify';
 import { useGiphy } from '../hooks/useGiphy';
 import { getAudioFeatures, getAudioAnalysis } from '../lib/spotify';
+import { setTrackMeta } from '../lib/store';
 
 interface Props {
   accessToken: string;
@@ -37,6 +38,19 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, []);
 
+  const handleOpenDebug = useCallback(() => {
+    const win = new WebviewWindow('api-debug', {
+      url: '/?view=debug',
+      title: 'API Debug',
+      width: 560,
+      height: 700,
+      resizable: true,
+      decorations: true,
+      alwaysOnTop: false,
+    });
+    win.once('tauri://error', (e) => console.error('[debug-window]', e));
+  }, []);
+
   const handleOpenInfo = useCallback(async () => {
     if (!currentTrack) return;
 
@@ -45,10 +59,7 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
       getAudioAnalysis(currentTrack.trackId, accessToken).catch(() => null),
     ]);
 
-    localStorage.setItem(
-      'gif-player-meta',
-      JSON.stringify({ track: currentTrack, genre: currentGenre, audioFeatures, audioAnalysis })
-    );
+    await setTrackMeta({ track: currentTrack, genre: currentGenre, audioFeatures, audioAnalysis });
 
     const win = new WebviewWindow('track-metadata', {
       url: '/?view=metadata',
@@ -259,6 +270,8 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
               title="Toggle automatic GIF rotation every 1.5 min"
               active={autoRotate}
             />
+            <Sep />
+            <TextButton label="Debug" onClick={handleOpenDebug} title="Open API debug panel" />
             <Sep />
             <TextButton label="Logout" onClick={onLogout} />
           </div>

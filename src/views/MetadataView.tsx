@@ -3,6 +3,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { LogicalSize } from '@tauri-apps/api/dpi';
 import type { NowPlaying, AudioFeatures, AudioAnalysis } from '../lib/spotify';
+import { getTrackMeta } from '../lib/store';
 
 interface StoredMeta {
   track: NowPlaying;
@@ -120,10 +121,61 @@ function Divider() {
   return <div style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)', margin: '18px 0' }} />;
 }
 
+function JsonToggleButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        background: open ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        borderRadius: 6,
+        padding: '2px 8px',
+        color: open ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.45)',
+        fontSize: '0.68rem',
+        fontWeight: 600,
+        fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+        cursor: 'pointer',
+        letterSpacing: '0.04em',
+        lineHeight: 1.6,
+        transition: 'background 120ms ease, color 120ms ease',
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.16)')}
+      onMouseLeave={(e) => (e.currentTarget.style.background = open ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)')}
+    >
+      {open ? '{ ▲ }' : '{ }'}
+    </button>
+  );
+}
+
+function JsonPanel({ data, label }: { data: unknown; label: string }) {
+  return (
+    <div style={{ marginTop: 12, marginBottom: 4 }}>
+      <div style={{
+        fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)',
+        textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8,
+      }}>
+        {label}
+      </div>
+      <pre
+        dangerouslySetInnerHTML={{ __html: highlightJson(JSON.stringify(data, null, 2)) }}
+        style={{
+          margin: 0, padding: '12px 14px',
+          backgroundColor: '#1a1a1a', borderRadius: 8,
+          border: '1px solid rgba(255,255,255,0.08)',
+          fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+          fontSize: '0.68rem', lineHeight: 1.6,
+          overflowX: 'auto', color: '#d4d4d4', whiteSpace: 'pre',
+        }}
+      />
+    </div>
+  );
+}
+
 // ── JSON syntax highlighter ──────────────────────────────────────
 
-const BASE_HEIGHT = 820;
-const JSON_EXTRA  = 400;
+const BASE_HEIGHT   = 820;
+const JSON_EXTRA    = 400;
+const JSON_PER_PANEL = 300;
 
 function highlightJson(json: string): string {
   return json.replace(
@@ -147,20 +199,30 @@ function highlightJson(json: string): string {
 export function MetadataView() {
   const [meta, setMeta] = useState<StoredMeta | null>(null);
   const [showJson, setShowJson] = useState(false);
+  const [showTrackJson, setShowTrackJson]       = useState(false);
+  const [showFeaturesJson, setShowFeaturesJson] = useState(false);
+  const [showAnalysisJson, setShowAnalysisJson] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('gif-player-meta');
-      if (raw) setMeta(JSON.parse(raw) as StoredMeta);
-    } catch { /* ignore */ }
+    getTrackMeta()
+      .then((data) => { if (data) setMeta(data as StoredMeta); })
+      .catch(() => { /* ignore */ });
   }, []);
+
+  async function resizeWindow(openCount: number) {
+    try {
+      const win = getCurrentWebviewWindow();
+      await win.setSize(new LogicalSize(540, BASE_HEIGHT + openCount * JSON_PER_PANEL + (showJson ? JSON_EXTRA : 0)));
+    } catch { /* scrollable fallback */ }
+  }
 
   async function toggleJson() {
     const next = !showJson;
     setShowJson(next);
+    const perSectionCount = [showTrackJson, showFeaturesJson, showAnalysisJson].filter(Boolean).length;
     try {
       const win = getCurrentWebviewWindow();
-      await win.setSize(new LogicalSize(540, next ? BASE_HEIGHT + JSON_EXTRA : BASE_HEIGHT));
+      await win.setSize(new LogicalSize(540, BASE_HEIGHT + perSectionCount * JSON_PER_PANEL + (next ? JSON_EXTRA : 0)));
     } catch { /* falls back to scrollable view */ }
   }
 
@@ -224,6 +286,19 @@ export function MetadataView() {
           {track.albumName}
         </div>
 
+        {/* ── Track Info section header ── */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <SectionLabel label="Track Info" />
+          <JsonToggleButton
+            open={showTrackJson}
+            onToggle={() => {
+              const next = !showTrackJson;
+              setShowTrackJson(next);
+              void resizeWindow([next, showFeaturesJson, showAnalysisJson].filter(Boolean).length);
+            }}
+          />
+        </div>
+
         {/* Metadata grid */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 28px', marginBottom: 22 }}>
           <Row label="Duration" value={fmtDuration(track.durationMs)} />
@@ -240,11 +315,23 @@ export function MetadataView() {
           <Bar value={track.popularity} />
         </div>
 
+        {showTrackJson && <JsonPanel data={track} label="Spotify /me/player response" />}
+
         {/* ── Audio Features ── */}
         {audioFeatures && (
           <>
             <Divider />
-            <SectionLabel label="Audio Features" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <SectionLabel label="Audio Features" />
+              <JsonToggleButton
+                open={showFeaturesJson}
+                onToggle={() => {
+                  const next = !showFeaturesJson;
+                  setShowFeaturesJson(next);
+                  void resizeWindow([showTrackJson, next, showAnalysisJson].filter(Boolean).length);
+                }}
+              />
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 16px', marginBottom: 16 }}>
               <Row label="Tempo"    value={`${Math.round(audioFeatures.tempo)} BPM`} />
@@ -260,6 +347,7 @@ export function MetadataView() {
             <FeatureBar label="Instrumentalness" value={audioFeatures.instrumentalness} />
             <FeatureBar label="Speechiness"      value={audioFeatures.speechiness} />
             <FeatureBar label="Liveness"         value={audioFeatures.liveness} />
+            {showFeaturesJson && <JsonPanel data={audioFeatures} label="Spotify /audio-features response" />}
           </>
         )}
 
@@ -267,7 +355,17 @@ export function MetadataView() {
         {audioAnalysis && (
           <>
             <Divider />
-            <SectionLabel label="Audio Analysis" />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <SectionLabel label="Audio Analysis" />
+              <JsonToggleButton
+                open={showAnalysisJson}
+                onToggle={() => {
+                  const next = !showAnalysisJson;
+                  setShowAnalysisJson(next);
+                  void resizeWindow([showTrackJson, showFeaturesJson, next].filter(Boolean).length);
+                }}
+              />
+            </div>
 
             {/* Structure counts */}
             <div style={{
@@ -331,7 +429,7 @@ export function MetadataView() {
             {/* Sections timeline */}
             {audioAnalysis.sections.length > 0 && (
               <div>
-                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8 }}>
+                <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8, }}>
                   Song Sections
                 </div>
                 <div style={{ display: 'flex', height: 28, borderRadius: 6, overflow: 'hidden', gap: 2 }}>
@@ -377,6 +475,7 @@ export function MetadataView() {
                 </div>
               </div>
             )}
+            {showAnalysisJson && <JsonPanel data={audioAnalysis} label="Spotify /audio-analysis response" />}
           </>
         )}
 

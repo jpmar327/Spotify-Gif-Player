@@ -2,13 +2,14 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { MetadataView } from './views/MetadataView';
+import { DebugView } from './views/DebugView';
 import './styles/global.css';
 
-// Checked once at startup — if this is the metadata popup window, skip the full auth flow.
-const isMetadataWindow = new URLSearchParams(window.location.search).get('view') === 'metadata';
+const params = new URLSearchParams(window.location.search);
+const view = params.get('view');
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    {isMetadataWindow ? <MetadataView /> : <App />}
+    {view === 'metadata' ? <MetadataView /> : view === 'debug' ? <DebugView /> : <App />}
   </React.StrictMode>
 );
