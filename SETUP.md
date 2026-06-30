@@ -57,7 +57,15 @@ VITE_LASTFM_API_KEY=your_lastfm_key_here
 ```
 If the key is missing or left as the placeholder, a console warning is logged and the app continues working normally.
 
-### 5. Register the Redirect URI in Spotify Developer Dashboard
+### 5. Add Your Klipy API Key (optional — GIF fallback source)
+Klipy is used as a fallback when Giphy returns fewer than 5 results for a genre search. Without it Giphy continues working alone.
+1. Go to https://klipy.com/developers and create an account.
+2. Generate a Test API key from the Partner Panel to verify the integration (100 calls/min).
+3. In Partner Panel settings, disable ad insertion — this app has no ad slot.
+4. Once verified, request production access for unlimited calls.
+5. Add the key to `.env` as `VITE_KLIPY_API_KEY`.
+
+### 6. Register the Redirect URI in Spotify Developer Dashboard
 The PKCE flow redirects back to the app using a custom URI scheme (`spotifygif://callback`).
 You must whitelist this URI in your Spotify app settings:
 
@@ -67,14 +75,14 @@ You must whitelist this URI in your Spotify app settings:
 4. Under **Redirect URIs**, add: `spotifygif://callback`
 5. Save
 
-### 6. Generate App Icons (required to build)
+### 7. Generate App Icons (required to build)
 Replace the placeholder `src-tauri/icons/` directory with real icons. The easiest way is to run (after `npm install`):
 ```
 npm run tauri icon path/to/your/image.png
 ```
 This generates all required sizes from a single 1024×1024 PNG. Without valid icons, `tauri build` will fail.
 
-### 7. Replace the Idle GIF (optional)
+### 8. Replace the Idle GIF (optional)
 `public/idle.gif` is shown when Spotify is paused or closed. Replace it with any GIF you like.
 
 ---

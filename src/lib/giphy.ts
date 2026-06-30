@@ -6,6 +6,7 @@ const GIPHY_SEARCH = 'https://api.giphy.com/v1/gifs/search';
 export interface GiphyResult {
   url: string;
   id: string;
+  resultCount: number;
 }
 
 export async function fetchGif(query: string): Promise<GiphyResult | null> {
@@ -40,7 +41,7 @@ export async function fetchGif(query: string): Promise<GiphyResult | null> {
   if (!data.data || data.data.length === 0) return null;
 
   const pick = data.data[Math.floor(Math.random() * data.data.length)];
-  return { url: pick.images.original.url, id: pick.id };
+  return { url: pick.images.original.url, id: pick.id, resultCount: data.data.length };
 }
 
 export function preloadGif(url: string): Promise<string> {
