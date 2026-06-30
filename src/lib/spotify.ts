@@ -7,21 +7,71 @@ function normalize(str: string): string {
   return str.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 }
 
-const GENRE_LIST = [
-  'rap', 'hip hop', 'rock', 'alternative', 'country',
-  'trap', 'metal', 'jazz', 'r&b', 'pop', 'funk', 'edm', 'soul',
-  'punk', 'indie', 'folk', 'blues', 'reggae', 'classical',
-  'house', 'techno', 'drum and bass', 'k-pop', 'latin', 'gospel',
-  'ambient', 'disco',
-  // Latin / Caribbean
-  'bachata', 'merengue', 'salsa', 'reggaeton', 'dembow',
-  // Brazilian
-  'forro', 'pagode', 'samba', 'funk brasileiro', 'sertanejo',
-  // Regional Mexican
-  'banda', 'corridos', 'norteno', 'mariachi',
-] as const;
+// Each genre has a canonical key (used everywhere else in the app — search
+// terms, UI display, etc.) plus a list of alias substrings that real-world
+// Last.fm/Spotify tags actually use. ALL aliases are checked when matching;
+// the canonical key itself is always included as an alias automatically.
+const GENRE_DEFINITIONS = {
+  'rap':             { aliases: ['rap'] },
+  'hip hop':         { aliases: ['hip hop', 'hiphop', 'hip-hop'] },
+  'rock':            { aliases: ['rock'] },
+  'alternative':     { aliases: ['alternative', 'alt rock'] },
+  'country':         { aliases: ['country'] },
+  'trap':            { aliases: ['trap'] },
+  'metal':           { aliases: ['metal'] },
+  'jazz':            { aliases: ['jazz'] },
+  'r&b':             { aliases: ['r&b', 'rnb', 'r and b'] },
+  'pop':             { aliases: ['pop'] },
+  'funk':            { aliases: ['funk', 'p-funk', 'funk rock'] },
+  'edm':             { aliases: ['edm', 'electronic dance music', 'electronica', 'dance'] },
+  'soul':            { aliases: ['soul'] },
+  'punk':            { aliases: ['punk', 'post-punk', 'post punk'] },
+  'indie':           { aliases: ['indie'] },
+  'folk':            { aliases: ['folk'] },
+  'blues':           { aliases: ['blues'] },
+  'reggae':          { aliases: ['reggae'] },
+  'classical':       { aliases: ['classical'] },
+  'house':           { aliases: ['house'] },
+  'techno':          { aliases: ['techno'] },
+  'drum and bass':   { aliases: ['drum and bass', 'dnb', 'drum & bass', 'jungle'] },
+  'k-pop':           { aliases: ['k-pop', 'kpop', 'korean pop'] },
+  'latin':           { aliases: ['latin', 'latino', 'latin pop'] },
+  'gospel':          { aliases: ['gospel'] },
+  'ambient':         { aliases: ['ambient'] },
+  'disco':           { aliases: ['disco'] },
 
-type Genre = (typeof GENRE_LIST)[number];
+  // Latin / Caribbean
+  'bachata':         { aliases: ['bachata'] },
+  'merengue':        { aliases: ['merengue'] },
+  'salsa':           { aliases: ['salsa'] },
+  'reggaeton':       { aliases: ['reggaeton', 'reggaeton urbano'] },
+  'dembow':          { aliases: ['dembow'] },
+
+  // Brazilian — the canonical key stays 'funk brasileiro' so UI/search terms
+  // are unaffected, but it now also matches the real-world tag spellings
+  // that were previously falling through to plain 'funk'.
+  'forro':           { aliases: ['forro', 'forró'] },
+  'pagode':          { aliases: ['pagode'] },
+  'samba':           { aliases: ['samba'] },
+  'funk brasileiro': {
+    aliases: [
+      'funk brasileiro', 'funk carioca', 'brazilian funk',
+      'baile funk', 'funk ostentacao', 'funk ostentação',
+      'funk 150', 'funk mtg', 'mandelao', 'mandelão',
+    ],
+  },
+  'sertanejo':       { aliases: ['sertanejo'] },
+
+  // Regional Mexican
+  'banda':           { aliases: ['banda'] },
+  'corridos':        { aliases: ['corridos', 'corridos tumbados'] },
+  'norteno':         { aliases: ['norteno', 'norteño'] },
+  'mariachi':        { aliases: ['mariachi'] },
+} as const;
+
+type Genre = keyof typeof GENRE_DEFINITIONS;
+
+const GENRE_LIST = Object.keys(GENRE_DEFINITIONS) as Genre[];
 
 export interface NowPlaying {
   trackId: string;
@@ -41,11 +91,14 @@ export interface NowPlaying {
   explicit: boolean;
 }
 
-// Multi-word, more specific genres are checked first so they "claim" a tag
-// before a shorter generic genre can match the same substring. This fixes
-// the case where "funk carioca" or "brazilian funk" would otherwise match
-// the plain 'funk' entry instead of 'funk brasileiro'.
-const SORTED_GENRE_LIST = [...GENRE_LIST].sort((a, b) => b.length - a.length);
+// Build a flat list of { genre, alias } pairs, sorted by alias length
+// descending — so the most specific alias (e.g. "funk carioca") is checked
+// before a shorter generic one (e.g. "funk") and claims the tag first.
+const SORTED_ALIAS_PAIRS: Array<{ genre: Genre; alias: string }> = GENRE_LIST
+  .flatMap((genre) =>
+    GENRE_DEFINITIONS[genre].aliases.map((alias) => ({ genre, alias: normalize(alias) }))
+  )
+  .sort((a, b) => b.alias.length - a.alias.length);
 
 export function genreFinder(genreArray: string[]): Genre | undefined {
   if (genreArray.length === 0) return undefined;
@@ -55,21 +108,23 @@ export function genreFinder(genreArray: string[]): Genre | undefined {
   for (const g of GENRE_LIST) frequency[g] = 0;
 
   const claimedTagIndices = new Set<number>();
-  let topGenre: Genre | undefined;
-  let topCount = 0;
 
-  for (const genre of SORTED_GENRE_LIST) {
-    const normalizedGenre = normalize(genre);
+  for (const { genre, alias } of SORTED_ALIAS_PAIRS) {
     normalizedTags.forEach((tag, i) => {
-      if (claimedTagIndices.has(i)) return; // tag already matched a more specific genre
-      if (tag.includes(normalizedGenre)) {
+      if (claimedTagIndices.has(i)) return; // tag already matched a more specific alias
+      if (tag.includes(alias)) {
         frequency[genre]++;
         claimedTagIndices.add(i);
       }
     });
+  }
+
+  let topGenre: Genre | undefined;
+  let topCount = 0;
+  for (const genre of GENRE_LIST) {
     if (frequency[genre] > topCount) {
       topCount = frequency[genre];
-      topGenre = genre as Genre;
+      topGenre = genre;
     }
   }
 
