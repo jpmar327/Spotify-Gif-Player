@@ -1,4 +1,5 @@
 import { loggedFetch } from './apiLogger';
+import { getSearchTerm } from './genreSearchTerms';
 
 const API_KEY = import.meta.env.VITE_KLIPY_API_KEY as string;
 // Klipy's GIF search endpoint — confirm against current docs at
@@ -17,7 +18,7 @@ export async function fetchKlipyGif(query: string): Promise<KlipyResult | null> 
   }
 
   const params = new URLSearchParams({
-    q: query,
+    q: getSearchTerm(query),
     api_key: API_KEY,
     per_page: '20',
   });

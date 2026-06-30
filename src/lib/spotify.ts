@@ -1,8 +1,24 @@
 import { loggedFetch } from './apiLogger';
 
+// Strips accents/diacritics so "forró" and "forro" both match the same
+// GENRE_LIST entry. Applied to both GENRE_LIST values and incoming tags
+// before comparison.
+function normalize(str: string): string {
+  return str.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 const GENRE_LIST = [
   'rap', 'hip hop', 'rock', 'alternative', 'country',
   'trap', 'metal', 'jazz', 'r&b', 'pop', 'funk', 'edm', 'soul',
+  'punk', 'indie', 'folk', 'blues', 'reggae', 'classical',
+  'house', 'techno', 'drum and bass', 'k-pop', 'latin', 'gospel',
+  'ambient', 'disco',
+  // Latin / Caribbean
+  'bachata', 'merengue', 'salsa', 'reggaeton', 'dembow',
+  // Brazilian
+  'forro', 'pagode', 'samba', 'funk brasileiro', 'sertanejo',
+  // Regional Mexican
+  'banda', 'corridos', 'norteno', 'mariachi',
 ] as const;
 
 type Genre = (typeof GENRE_LIST)[number];
@@ -25,24 +41,35 @@ export interface NowPlaying {
   explicit: boolean;
 }
 
-// Returns the genre from GENRE_LIST with the highest frequency in genreArray.
-// Uses strict > so the first genre wins ties (fixes original >= bug).
+// Multi-word, more specific genres are checked first so they "claim" a tag
+// before a shorter generic genre can match the same substring. This fixes
+// the case where "funk carioca" or "brazilian funk" would otherwise match
+// the plain 'funk' entry instead of 'funk brasileiro'.
+const SORTED_GENRE_LIST = [...GENRE_LIST].sort((a, b) => b.length - a.length);
+
 export function genreFinder(genreArray: string[]): Genre | undefined {
   if (genreArray.length === 0) return undefined;
 
+  const normalizedTags = genreArray.map(normalize);
   const frequency: Record<string, number> = {};
   for (const g of GENRE_LIST) frequency[g] = 0;
 
+  const claimedTagIndices = new Set<number>();
   let topGenre: Genre | undefined;
   let topCount = 0;
 
-  for (const genre of GENRE_LIST) {
-    for (const tag of genreArray) {
-      if (tag.includes(genre)) frequency[genre]++;
-    }
+  for (const genre of SORTED_GENRE_LIST) {
+    const normalizedGenre = normalize(genre);
+    normalizedTags.forEach((tag, i) => {
+      if (claimedTagIndices.has(i)) return; // tag already matched a more specific genre
+      if (tag.includes(normalizedGenre)) {
+        frequency[genre]++;
+        claimedTagIndices.add(i);
+      }
+    });
     if (frequency[genre] > topCount) {
       topCount = frequency[genre];
-      topGenre = genre;
+      topGenre = genre as Genre;
     }
   }
 
