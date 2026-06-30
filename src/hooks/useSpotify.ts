@@ -4,7 +4,7 @@ import {
   getArtistGenres,
   genreFinder,
   pausePlayback,
-  resumePlayback,
+  smartPlay,
   skipToNext,
   skipToPrevious,
   type NowPlaying,
@@ -22,9 +22,16 @@ interface UseSpotifyOptions {
   autoRotate: boolean;
 }
 
+export interface GenreResolution {
+  source: 'lastfm' | 'spotify' | 'none';
+  tagsFound: string[];
+  resolvedGenre: string;
+}
+
 export interface UseSpotifyResult {
   currentTrack: NowPlaying | null;
   currentGenre: string | null;
+  genreResolution: GenreResolution | null;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   next: () => Promise<void>;
@@ -41,6 +48,7 @@ export function useSpotify({
 }: UseSpotifyOptions): UseSpotifyResult {
   const [currentTrack, setCurrentTrack] = useState<NowPlaying | null>(null);
   const [currentGenre, setCurrentGenre] = useState<string | null>(null);
+  const [genreResolution, setGenreResolution] = useState<GenreResolution | null>(null);
 
   const previousTrackIdRef = useRef<string | null>(null);
   const tokenRef = useRef(accessToken);
@@ -141,10 +149,12 @@ export function useSpotify({
       await clearApiLog();
 
       let genres: string[] = [];
+      let source: GenreResolution['source'] = 'none';
 
       // 1st: Last.fm — track-level tags, most accurate and best coverage
       try {
         genres = await getTrackTags(playback.artistName, playback.trackName);
+        if (genres.length > 0) source = 'lastfm';
       } catch {
         // Last.fm failed — will try Spotify below
       }
@@ -154,6 +164,7 @@ export function useSpotify({
       if (genres.length === 0) {
         try {
           genres = await getArtistGenres(playback.artistId, tokenRef.current);
+          if (genres.length > 0) source = 'spotify';
         } catch {
           // Spotify also failed — genre will fall back via genreFinder below
         }
@@ -165,6 +176,7 @@ export function useSpotify({
       lastGenreRef.current = genre;
       lastGifChangeRef.current = Date.now();
       setCurrentGenre(genre);
+      setGenreResolution({ source, tagsFound: genres, resolvedGenre: genre });
       onTrackChangeRef.current(genre);
     };
 
@@ -182,8 +194,9 @@ export function useSpotify({
   return {
     currentTrack,
     currentGenre,
+    genreResolution,
     pause: makeControl(pausePlayback),
-    resume: makeControl(resumePlayback),
+    resume: makeControl(smartPlay),
     next: makeControl(skipToNext),
     previous: makeControl(skipToPrevious),
   };

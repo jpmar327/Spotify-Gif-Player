@@ -65,7 +65,11 @@ Klipy is used as a fallback when Giphy returns fewer than 5 results for a genre 
 4. Once verified, request production access for unlimited calls.
 5. Add the key to `.env` as `VITE_KLIPY_API_KEY`.
 
-### 6. Register the Redirect URI in Spotify Developer Dashboard
+### 6. Re-login if you were already logged in
+
+This version adds the `user-library-read` scope (needed for the smart play button to fall back to Liked Songs when nothing is active). If you were already logged in before this update, log out and log back in once so the new permission is granted.
+
+### 7. Register the Redirect URI in Spotify Developer Dashboard
 The PKCE flow redirects back to the app using a custom URI scheme (`spotifygif://callback`).
 You must whitelist this URI in your Spotify app settings:
 
@@ -75,14 +79,14 @@ You must whitelist this URI in your Spotify app settings:
 4. Under **Redirect URIs**, add: `spotifygif://callback`
 5. Save
 
-### 7. Generate App Icons (required to build)
+### 8. Generate App Icons (required to build)
 Replace the placeholder `src-tauri/icons/` directory with real icons. The easiest way is to run (after `npm install`):
 ```
 npm run tauri icon path/to/your/image.png
 ```
 This generates all required sizes from a single 1024×1024 PNG. Without valid icons, `tauri build` will fail.
 
-### 8. Replace the Idle GIF (optional)
+### 9. Replace the Idle GIF (optional)
 `public/idle.gif` is shown when Spotify is paused or closed. Replace it with any GIF you like.
 
 ---

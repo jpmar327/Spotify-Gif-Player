@@ -1,6 +1,6 @@
 const CLIENT_ID = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string;
 const REDIRECT_URI = 'spotifygif://callback';
-const SCOPES = 'user-read-playback-state user-read-private user-modify-playback-state';
+const SCOPES = 'user-read-playback-state user-read-private user-modify-playback-state user-library-read';
 
 export function generateVerifier(): string {
   const array = new Uint8Array(32);

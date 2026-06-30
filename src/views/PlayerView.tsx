@@ -19,7 +19,7 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { gifUrl, visible, changeGif, showIdle } = useGiphy('/idle.gif');
-  const { currentTrack, currentGenre, pause, resume, next, previous } = useSpotify({
+  const { currentTrack, currentGenre, genreResolution, pause, resume, next, previous } = useSpotify({
     accessToken,
     onTrackChange: changeGif,
     onIdle: showIdle,
@@ -46,19 +46,21 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
       getAudioAnalysis(currentTrack.trackId, accessToken).catch(() => null),
     ]);
 
-    await setTrackMeta({ track: currentTrack, genre: currentGenre, audioFeatures, audioAnalysis });
+    await setTrackMeta({ track: currentTrack, genre: currentGenre, audioFeatures, audioAnalysis, genreResolution });
 
     const win = new WebviewWindow('track-metadata', {
       url: '/?view=metadata',
       title: 'Track Info',
-      width: 540,
-      height: 820,
-      resizable: false,
+      width: 580,
+      height: 760,
+      minWidth: 480,
+      minHeight: 400,
+      resizable: true,
       decorations: true,
-      alwaysOnTop: true,
+      alwaysOnTop: false,
     });
     win.once('tauri://error', (e) => console.error('[meta-window]', e));
-  }, [currentTrack, currentGenre, accessToken]);
+  }, [currentTrack, currentGenre, genreResolution, accessToken]);
 
   const isSpotifyPlaying = currentTrack?.isPlaying ?? false;
 

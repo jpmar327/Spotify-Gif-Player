@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-shell';
-import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { LogicalSize } from '@tauri-apps/api/dpi';
 import type { NowPlaying, AudioFeatures, AudioAnalysis } from '../lib/spotify';
 import { getTrackMeta, getApiLog, type ApiLogEntry } from '../lib/store';
+import { getSearchTerm } from '../lib/genreSearchTerms';
+
+interface GenreResolution {
+  source: 'lastfm' | 'spotify' | 'none';
+  tagsFound: string[];
+  resolvedGenre: string;
+}
 
 interface StoredMeta {
   track: NowPlaying;
   genre: string | null;
   audioFeatures: AudioFeatures | null;
   audioAnalysis: AudioAnalysis | null;
+  genreResolution: GenreResolution | null;
 }
 
 // ── Shared helpers ───────────────────────────────────────────────
@@ -256,9 +262,9 @@ function ApiCard({ entry }: { entry: ApiLogEntry }) {
 
 // ── JSON syntax highlighter ──────────────────────────────────────
 
-const BASE_HEIGHT   = 820;
-const JSON_EXTRA    = 400;
-const JSON_PER_PANEL = 300;
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+}
 
 function highlightJson(json: string): string {
   return json.replace(
@@ -295,21 +301,8 @@ export function MetadataView() {
       .catch(() => { /* ignore */ });
   }, []);
 
-  async function resizeWindow(openCount: number) {
-    try {
-      const win = getCurrentWebviewWindow();
-      await win.setSize(new LogicalSize(540, BASE_HEIGHT + openCount * JSON_PER_PANEL + (showJson ? JSON_EXTRA : 0)));
-    } catch { /* scrollable fallback */ }
-  }
-
-  async function toggleJson() {
-    const next = !showJson;
-    setShowJson(next);
-    const perSectionCount = [showTrackJson, showFeaturesJson, showAnalysisJson].filter(Boolean).length;
-    try {
-      const win = getCurrentWebviewWindow();
-      await win.setSize(new LogicalSize(540, BASE_HEIGHT + perSectionCount * JSON_PER_PANEL + (next ? JSON_EXTRA : 0)));
-    } catch { /* falls back to scrollable view */ }
+  function toggleJson() {
+    setShowJson((v) => !v);
   }
 
   if (!meta) {
@@ -377,11 +370,7 @@ export function MetadataView() {
           <SectionLabel label="Track Info" />
           <JsonToggleButton
             open={showTrackJson}
-            onToggle={() => {
-              const next = !showTrackJson;
-              setShowTrackJson(next);
-              void resizeWindow([next, showFeaturesJson, showAnalysisJson].filter(Boolean).length);
-            }}
+            onToggle={() => setShowTrackJson((v) => !v)}
           />
         </div>
 
@@ -390,7 +379,7 @@ export function MetadataView() {
           <Row label="Duration" value={fmtDuration(track.durationMs)} />
           <Row label="Released" value={fmtDate(track.albumReleaseDate)} />
           <Row label="Track"    value={`#${track.trackNumber}`} />
-          <Row label="Genre"    value={genre ? genre.charAt(0).toUpperCase() + genre.slice(1) : '—'} />
+          <Row label="Genre" value={genre ? toTitleCase(genre) : '—'} />
         </div>
 
         {/* Popularity */}
@@ -400,6 +389,63 @@ export function MetadataView() {
           </div>
           <Bar value={track.popularity} />
         </div>
+
+        {/* ── Genre Detection ── */}
+        {meta.genreResolution && (
+          <div style={{ marginTop: 18, marginBottom: 4 }}>
+            <div style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.38)', textTransform: 'uppercase', letterSpacing: '0.09em', marginBottom: 8 }}>
+              Genre Detection
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 10, padding: '12px 14px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: meta.genreResolution.tagsFound.length > 0 ? 10 : 0 }}>
+                <span style={{
+                  fontSize: '0.62rem', fontWeight: 700, textTransform: 'uppercase',
+                  letterSpacing: '0.06em', padding: '3px 8px', borderRadius: 4,
+                  backgroundColor:
+                    meta.genreResolution.source === 'lastfm' ? 'rgba(29,185,84,0.18)' :
+                    meta.genreResolution.source === 'spotify' ? 'rgba(100,180,255,0.18)' :
+                    'rgba(255,255,255,0.08)',
+                  color:
+                    meta.genreResolution.source === 'lastfm' ? '#1DB954' :
+                    meta.genreResolution.source === 'spotify' ? '#64b4ff' :
+                    'rgba(255,255,255,0.4)',
+                }}>
+                  {meta.genreResolution.source === 'lastfm' ? 'Last.fm'
+                    : meta.genreResolution.source === 'spotify' ? 'Spotify'
+                    : 'No tags found'}
+                </span>
+                <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.55)' }}>
+                  → resolved to <strong style={{ color: '#fff' }}>{toTitleCase(meta.genreResolution.resolvedGenre)}</strong>
+                </span>
+              </div>
+
+              {meta.genreResolution.tagsFound.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {meta.genreResolution.tagsFound.map((tag, i) => (
+                    <span key={i} style={{
+                      fontSize: '0.68rem', color: 'rgba(255,255,255,0.6)',
+                      backgroundColor: 'rgba(255,255,255,0.06)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: 500, padding: '3px 10px',
+                    }}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>
+                Search term: <span style={{ color: 'rgba(255,255,255,0.6)', fontStyle: 'italic' }}>
+                  "{getSearchTerm(meta.genreResolution.resolvedGenre)}"
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showTrackJson && <JsonPanel data={track} label="Spotify /me/player response" />}
 
@@ -411,11 +457,7 @@ export function MetadataView() {
               <SectionLabel label="Audio Features" />
               <JsonToggleButton
                 open={showFeaturesJson}
-                onToggle={() => {
-                  const next = !showFeaturesJson;
-                  setShowFeaturesJson(next);
-                  void resizeWindow([showTrackJson, next, showAnalysisJson].filter(Boolean).length);
-                }}
+                onToggle={() => setShowFeaturesJson((v) => !v)}
               />
             </div>
 
@@ -445,11 +487,7 @@ export function MetadataView() {
               <SectionLabel label="Audio Analysis" />
               <JsonToggleButton
                 open={showAnalysisJson}
-                onToggle={() => {
-                  const next = !showAnalysisJson;
-                  setShowAnalysisJson(next);
-                  void resizeWindow([showTrackJson, showFeaturesJson, next].filter(Boolean).length);
-                }}
+                onToggle={() => setShowAnalysisJson((v) => !v)}
               />
             </div>
 
@@ -642,12 +680,6 @@ export function MetadataView() {
                   setLogLoading(false);
                 }
               }
-              try {
-                const win = getCurrentWebviewWindow();
-                const perSection = [showTrackJson, showFeaturesJson, showAnalysisJson].filter(Boolean).length;
-                const extraHeight = (showJson ? JSON_EXTRA : 0) + (next ? 400 : 0);
-                await win.setSize(new LogicalSize(540, BASE_HEIGHT + perSection * JSON_PER_PANEL + extraHeight));
-              } catch { /* scrollable fallback */ }
             }}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
