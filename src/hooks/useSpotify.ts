@@ -141,21 +141,27 @@ export function useSpotify({
       await clearApiLog();
 
       let genres: string[] = [];
+
+      // 1st: Last.fm — track-level tags, most accurate and best coverage
       try {
-        genres = await getArtistGenres(playback.artistId, tokenRef.current);
+        genres = await getTrackTags(playback.artistName, playback.trackName);
       } catch {
-        // Spotify genre fetch failed — will try Last.fm below
+        // Last.fm failed — will try Spotify below
       }
 
+      // 2nd: Spotify — artist-level genres, broader but always available since
+      // artistId is already in the playback payload (no extra round trip cost)
       if (genres.length === 0) {
         try {
-          genres = await getTrackTags(playback.artistName, playback.trackName);
+          genres = await getArtistGenres(playback.artistId, tokenRef.current);
         } catch {
-          // Last.fm also failed — genre will fall back to 'music' via genreFinder
+          // Spotify also failed — genre will fall back via genreFinder below
         }
       }
 
-      const genre = genreFinder(genres) ?? 'music';
+      // 3rd: 'music visualizer' is a better Giphy/Klipy search term than plain
+      // 'music' when neither source returns a usable genre
+      const genre = genreFinder(genres) ?? 'music visualizer';
       lastGenreRef.current = genre;
       lastGifChangeRef.current = Date.now();
       setCurrentGenre(genre);
