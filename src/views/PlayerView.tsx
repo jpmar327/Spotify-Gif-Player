@@ -38,19 +38,6 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); };
   }, []);
 
-  const handleOpenDebug = useCallback(() => {
-    const win = new WebviewWindow('api-debug', {
-      url: '/?view=debug',
-      title: 'API Debug',
-      width: 560,
-      height: 700,
-      resizable: true,
-      decorations: true,
-      alwaysOnTop: false,
-    });
-    win.once('tauri://error', (e) => console.error('[debug-window]', e));
-  }, []);
-
   const handleOpenInfo = useCallback(async () => {
     if (!currentTrack) return;
 
@@ -270,8 +257,6 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
               title="Toggle automatic GIF rotation every 1.5 min"
               active={autoRotate}
             />
-            <Sep />
-            <TextButton label="Debug" onClick={handleOpenDebug} title="Open API debug panel" />
             <Sep />
             <TextButton label="Logout" onClick={onLogout} />
           </div>

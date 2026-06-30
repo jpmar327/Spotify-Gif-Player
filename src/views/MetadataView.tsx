@@ -3,7 +3,7 @@ import { open } from '@tauri-apps/plugin-shell';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { LogicalSize } from '@tauri-apps/api/dpi';
 import type { NowPlaying, AudioFeatures, AudioAnalysis } from '../lib/spotify';
-import { getTrackMeta } from '../lib/store';
+import { getTrackMeta, getApiLog, type ApiLogEntry } from '../lib/store';
 
 interface StoredMeta {
   track: NowPlaying;
@@ -171,6 +171,89 @@ function JsonPanel({ data, label }: { data: unknown; label: string }) {
   );
 }
 
+// ── API log helpers ──────────────────────────────────────────────
+
+function statusColor(status: number | null): string {
+  if (status === null) return '#e24b4a';
+  if (status >= 200 && status < 300) return '#1DB954';
+  if (status >= 400 && status < 500) return '#EF9F27';
+  return '#e24b4a';
+}
+
+function ApiCard({ entry }: { entry: ApiLogEntry }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{
+      backgroundColor: 'rgba(255,255,255,0.04)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 10,
+      marginBottom: 8,
+      overflow: 'hidden',
+    }}>
+      {/* Header row */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer' }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span style={{ flexShrink: 0, fontSize: '0.7rem', fontWeight: 700, color: statusColor(entry.status), minWidth: 34 }}>
+          {entry.status ?? 'ERR'}
+        </span>
+        <span style={{ flex: 1, fontSize: '0.8rem', fontWeight: 600, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {entry.label}
+        </span>
+        <span style={{ flexShrink: 0, fontSize: '0.7rem', color: 'rgba(255,255,255,0.35)' }}>
+          {entry.durationMs}ms
+        </span>
+        <span style={{ flexShrink: 0, fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 150ms ease' }}>
+          ▼
+        </span>
+      </div>
+
+      {/* Expanded content */}
+      {open && (
+        <div style={{ padding: '0 14px 14px' }}>
+          {/* URL */}
+          <div style={{
+            fontSize: '0.63rem',
+            color: 'rgba(255,255,255,0.35)',
+            fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+            wordBreak: 'break-all',
+            marginBottom: 8,
+            padding: '6px 10px',
+            backgroundColor: 'rgba(0,0,0,0.3)',
+            borderRadius: 6,
+          }}>
+            {entry.method} {entry.url}
+          </div>
+          {/* Timestamp */}
+          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.25)', marginBottom: 8 }}>
+            {new Date(entry.requestedAt).toLocaleTimeString()}
+          </div>
+          {/* JSON response */}
+          <pre
+            dangerouslySetInnerHTML={{
+              __html: highlightJson(
+                typeof entry.response === 'string'
+                  ? entry.response
+                  : JSON.stringify(entry.response, null, 2)
+              ),
+            }}
+            style={{
+              margin: 0, padding: '10px 12px',
+              backgroundColor: '#1a1a1a', borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.08)',
+              fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+              fontSize: '0.66rem', lineHeight: 1.6,
+              overflowX: 'auto', color: '#d4d4d4',
+              whiteSpace: 'pre', maxHeight: 360, overflowY: 'auto',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── JSON syntax highlighter ──────────────────────────────────────
 
 const BASE_HEIGHT   = 820;
@@ -202,6 +285,9 @@ export function MetadataView() {
   const [showTrackJson, setShowTrackJson]       = useState(false);
   const [showFeaturesJson, setShowFeaturesJson] = useState(false);
   const [showAnalysisJson, setShowAnalysisJson] = useState(false);
+  const [showApiLog, setShowApiLog] = useState(false);
+  const [apiLog, setApiLog]         = useState<ApiLogEntry[]>([]);
+  const [logLoading, setLogLoading] = useState(false);
 
   useEffect(() => {
     getTrackMeta()
@@ -535,6 +621,91 @@ export function MetadataView() {
                 overflowX: 'auto', color: '#d4d4d4', whiteSpace: 'pre',
               }}
             />
+          </div>
+        )}
+
+        {/* ── API Call Log ── */}
+        <Divider />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showApiLog ? 14 : 0 }}>
+          <button
+            onClick={async () => {
+              const next = !showApiLog;
+              setShowApiLog(next);
+              if (next) {
+                setLogLoading(true);
+                try {
+                  const log = await getApiLog();
+                  setApiLog(log);
+                } catch {
+                  setApiLog([]);
+                } finally {
+                  setLogLoading(false);
+                }
+              }
+              try {
+                const win = getCurrentWebviewWindow();
+                const perSection = [showTrackJson, showFeaturesJson, showAnalysisJson].filter(Boolean).length;
+                const extraHeight = (showJson ? JSON_EXTRA : 0) + (next ? 400 : 0);
+                await win.setSize(new LogicalSize(540, BASE_HEIGHT + perSection * JSON_PER_PANEL + extraHeight));
+              } catch { /* scrollable fallback */ }
+            }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              background: showApiLog ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 500, padding: '9px 16px',
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '0.78rem', fontWeight: 600, letterSpacing: '0.04em',
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.13)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = showApiLog ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.07)')}
+          >
+            {showApiLog ? '▲ Hide API Log' : '⚡ API Call Log'}
+          </button>
+
+          {showApiLog && (
+            <button
+              onClick={async () => {
+                setLogLoading(true);
+                try {
+                  const log = await getApiLog();
+                  setApiLog(log);
+                } catch {
+                  setApiLog([]);
+                } finally {
+                  setLogLoading(false);
+                }
+              }}
+              style={{
+                background: 'none', border: '1px solid rgba(255,255,255,0.10)',
+                borderRadius: 6, padding: '4px 10px',
+                color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.7)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.4)')}
+            >
+              ↻ Refresh
+            </button>
+          )}
+        </div>
+
+        {showApiLog && (
+          <div style={{ marginTop: 4 }}>
+            {logLoading && (
+              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>
+                Loading…
+              </div>
+            )}
+            {!logLoading && apiLog.length === 0 && (
+              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>
+                No API calls logged yet. Change tracks and reopen this panel.
+              </div>
+            )}
+            {!logLoading && apiLog.map((entry) => (
+              <ApiCard key={entry.id} entry={entry} />
+            ))}
           </div>
         )}
       </div>
