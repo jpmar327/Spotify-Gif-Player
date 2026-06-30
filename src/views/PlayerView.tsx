@@ -3,6 +3,7 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { open } from '@tauri-apps/plugin-shell';
 import { useSpotify } from '../hooks/useSpotify';
 import { useGiphy } from '../hooks/useGiphy';
+import { ToastHost, showToast } from '../components/Toast';
 import { getAudioFeatures, getAudioAnalysis } from '../lib/spotify';
 import { setTrackMeta } from '../lib/store';
 
@@ -24,6 +25,9 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
     onTrackChange: changeGif,
     onIdle: showIdle,
     onTokenRefreshed,
+    onNoActiveDevice: () => {
+      showToast('Open Spotify on your phone or computer, then press play.');
+    },
     isRunning,
     autoRotate,
   });
@@ -76,6 +80,7 @@ export function PlayerView({ accessToken, onLogout, onTokenRefreshed }: Props) {
       }}
       onMouseMove={showOverlay}
     >
+      <ToastHost />
       {/* Fullscreen GIF */}
       <img
         src={gifUrl}

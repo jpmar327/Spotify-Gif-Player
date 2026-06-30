@@ -4,7 +4,7 @@ import {
   getArtistGenres,
   genreFinder,
   pausePlayback,
-  smartPlay,
+  resumePlayback,
   skipToNext,
   skipToPrevious,
   type NowPlaying,
@@ -18,6 +18,7 @@ interface UseSpotifyOptions {
   onTrackChange: (genre: string) => void;
   onIdle: () => void;
   onTokenRefreshed: (newToken: string) => void;
+  onNoActiveDevice?: () => void;
   isRunning: boolean;
   autoRotate: boolean;
 }
@@ -43,6 +44,7 @@ export function useSpotify({
   onTrackChange,
   onIdle,
   onTokenRefreshed,
+  onNoActiveDevice,
   isRunning,
   autoRotate,
 }: UseSpotifyOptions): UseSpotifyResult {
@@ -55,6 +57,7 @@ export function useSpotify({
   const onTrackChangeRef = useRef(onTrackChange);
   const onIdleRef = useRef(onIdle);
   const onTokenRefreshedRef = useRef(onTokenRefreshed);
+  const onNoActiveDeviceRef = useRef<() => void>(() => {});
   const wasIdleRef = useRef(false);
   const lastGenreRef = useRef<string | null>(null);
   const lastGifChangeRef = useRef<number>(0);
@@ -64,6 +67,7 @@ export function useSpotify({
   onTrackChangeRef.current = onTrackChange;
   onIdleRef.current = onIdle;
   onTokenRefreshedRef.current = onTokenRefreshed;
+  onNoActiveDeviceRef.current = onNoActiveDevice ?? (() => {});
   autoRotateRef.current = autoRotate;
 
   useEffect(() => {
@@ -191,12 +195,25 @@ export function useSpotify({
     []
   );
 
+  const handleResume = useCallback(async () => {
+    try {
+      await resumePlayback(tokenRef.current);
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      if (status === 404) {
+        onNoActiveDeviceRef.current();
+      } else {
+        console.error('[Spotify control]', err);
+      }
+    }
+  }, []);
+
   return {
     currentTrack,
     currentGenre,
     genreResolution,
     pause: makeControl(pausePlayback),
-    resume: makeControl(smartPlay),
+    resume: handleResume,
     next: makeControl(skipToNext),
     previous: makeControl(skipToPrevious),
   };
