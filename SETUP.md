@@ -67,7 +67,7 @@ Klipy is used as a fallback when Giphy returns fewer than 5 results for a genre 
 
 ### 6. Re-login if you were already logged in
 
-This version adds the `user-library-read` scope (needed for the smart play button to fall back to Liked Songs when nothing is active). If you were already logged in before this update, log out and log back in once so the new permission is granted.
+If you were logged in before a recent update and notice auth errors, log out from the hover overlay and log back in. Scope changes between versions require a fresh login to take effect.
 
 ### 7. Register the Redirect URI in Spotify Developer Dashboard
 The PKCE flow redirects back to the app using a custom URI scheme (`spotifygif://callback`).
